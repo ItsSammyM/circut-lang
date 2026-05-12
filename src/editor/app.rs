@@ -58,6 +58,13 @@ pub struct App {
     pub library_rename_index: Option<usize>,
     /// Text being typed for the in-progress rename.
     pub library_rename_text: String,
+
+    /// Drag-and-drop reorder state for the input port list in the left panel.
+    /// Contains `(dragged_input_index, current_hover_target_index)` while a drag is live.
+    pub input_drag_reorder: Option<(usize, usize)>,
+    /// Drag-and-drop reorder state for the output port list in the right panel.
+    /// Contains `(dragged_output_index, current_hover_target_index)` while a drag is live.
+    pub output_drag_reorder: Option<(usize, usize)>,
 }
 
 impl Default for App {
@@ -82,6 +89,8 @@ impl Default for App {
             new_output_name: String::new(),
             library_rename_index: None,
             library_rename_text: String::new(),
+            input_drag_reorder: None,
+            output_drag_reorder: None,
         }
     }
 }

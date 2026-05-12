@@ -66,6 +66,30 @@ pub fn make_nand_node(pos: Pos2) -> EditorNode {
         input_count: 2,
         output_count: 1,
         kind: EditorNodeKind::Nand,
+        input_labels: vec!["A".into(), "B".into()],
+        output_labels: vec!["Q".into()],
+    }
+}
+
+/// Construct an `EditorNode` for a library gate instance at the given canvas position.
+/// Port labels are taken directly from the library gate's own input/output names.
+pub fn make_saved_gate_node(
+    pos: Pos2,
+    library_index: usize,
+    gate_label: String,
+    input_labels: Vec<String>,
+    output_labels: Vec<String>,
+) -> EditorNode {
+    let input_count  = input_labels.len();
+    let output_count = output_labels.len();
+    EditorNode {
+        label: gate_label,
+        pos,
+        input_count,
+        output_count,
+        kind: EditorNodeKind::SavedGate(library_index),
+        input_labels,
+        output_labels,
     }
 }
 

@@ -1,6 +1,6 @@
 use egui::{
     Button, Color32, Frame, Margin, RichText, SidePanel, Stroke, TextEdit, TextStyle,
-    TopBottomPanel,
+    TopBottomPanel, Sense,
 };
 
 use super::app::App;
@@ -102,8 +102,40 @@ impl App {
                 ui.separator();
 
                 let mut input_to_remove: Option<usize> = None;
+                let mut reorder_from_to: Option<(usize, usize)> = None;
+
+                let dragging_index: Option<usize> = self.input_drag_reorder.map(|(d, _)| d);
+
+                // Collect the screen-y centre of each row so we can determine the
+                // closest drop target from the pointer position.  The rows are
+                // rendered in order, so we fill this as we go.
+                let mut row_centre_ys: Vec<f32> = Vec::with_capacity(self.graph.inputs.len());
+
                 for input_index in 0..self.graph.inputs.len() {
-                    ui.horizontal(|ui| {
+                    let is_drop_target = self
+                        .input_drag_reorder
+                        .map(|(_, target_index)| target_index == input_index)
+                        .unwrap_or(false)
+                        && dragging_index != Some(input_index);
+
+                    // Draw a coloured line above this row when it is the current drop target.
+                    if is_drop_target {
+                        let available = ui.available_rect_before_wrap();
+                        ui.painter().hline(
+                            available.x_range(),
+                            available.top(),
+                            Stroke::new(2.0, COLOR_PORT_INPUT),
+                        );
+                    }
+
+                    let row_response = ui.horizontal(|ui| {
+                        // ── Drag handle ────────────────────────────────────
+                        let handle_response = ui.add(
+                            Button::new(RichText::new("⠿").color(COLOR_DIM).size(14.0))
+                                .frame(false)
+                                .sense(Sense::drag()),
+                        );
+
                         let is_on = self.input_states.get(input_index).copied().unwrap_or(false);
                         if ui.small_button(if is_on { "🟢" } else { "⚫" }).clicked() {
                             if let Some(state) = self.input_states.get_mut(input_index) {
@@ -115,14 +147,56 @@ impl App {
                         }
                         ui.add(
                             TextEdit::singleline(&mut self.graph.inputs[input_index])
-                                .desired_width(70.0)
+                                .desired_width(55.0)
                                 .font(TextStyle::Small),
                         );
                         if ui.small_button("✖").clicked() {
                             input_to_remove = Some(input_index);
                         }
+
+                        handle_response
                     });
+
+                    // Record this row's vertical centre for drop-target detection.
+                    let row_rect = row_response.response.rect;
+                    row_centre_ys.push(row_rect.center().y);
+
+                    let handle_response = row_response.inner;
+
+                    if handle_response.drag_started() {
+                        self.input_drag_reorder = Some((input_index, input_index));
+                    }
+
+                    if handle_response.dragged() {
+                        if let Some(pointer_pos) = ui.input(|input_state| input_state.pointer.interact_pos()) {
+                            let target_index = closest_index_to_y(pointer_pos.y, &row_centre_ys);
+                            if let Some((dragged_index, _)) = self.input_drag_reorder {
+                                self.input_drag_reorder = Some((dragged_index, target_index));
+                            }
+                        }
+                    }
+
+                    if handle_response.drag_stopped() {
+                        if let Some((dragged_index, target_index)) = self.input_drag_reorder.take() {
+                            if dragged_index != target_index {
+                                reorder_from_to = Some((dragged_index, target_index));
+                            }
+                        }
+                    }
                 }
+
+                // Apply a pending reorder outside the loop so indices are stable.
+                if let Some((old_index, new_index)) = reorder_from_to {
+                    if old_index < self.input_states.len() && new_index < self.input_states.len() {
+                        if old_index < new_index {
+                            self.input_states[old_index..=new_index].rotate_left(1);
+                        } else {
+                            self.input_states[new_index..=old_index].rotate_right(1);
+                        }
+                    }
+                    self.graph.reorder_input(old_index, new_index);
+                }
+
                 if let Some(index) = input_to_remove {
                     self.graph.remove_input(index);
                     if index < self.input_states.len() {
@@ -157,6 +231,7 @@ impl App {
                     "Right-click a wire\nto delete it",
                     "Middle-drag/scroll\nto pan & zoom",
                     "Hover + Del\nto delete a gate",
+                    "Drag ⠿ to reorder\nports",
                 ] {
                     ui.label(RichText::new(*hint_text).color(COLOR_DIM).size(10.0));
                     ui.add_space(3.0);
@@ -183,20 +258,87 @@ impl App {
                 ui.separator();
 
                 let mut output_to_remove: Option<usize> = None;
+                let mut reorder_from_to: Option<(usize, usize)> = None;
+
+                let dragging_index: Option<usize> = self.output_drag_reorder.map(|(d, _)| d);
+
+                let mut row_centre_ys: Vec<f32> = Vec::with_capacity(self.graph.outputs.len());
+
                 for output_index in 0..self.graph.outputs.len() {
-                    ui.horizontal(|ui| {
+                    let is_drop_target = self
+                        .output_drag_reorder
+                        .map(|(_, target_index)| target_index == output_index)
+                        .unwrap_or(false)
+                        && dragging_index != Some(output_index);
+
+                    if is_drop_target {
+                        let available = ui.available_rect_before_wrap();
+                        ui.painter().hline(
+                            available.x_range(),
+                            available.top(),
+                            Stroke::new(2.0, COLOR_PORT_OUTPUT),
+                        );
+                    }
+
+                    let row_response = ui.horizontal(|ui| {
+                        let handle_response = ui.add(
+                            Button::new(RichText::new("⠿").color(COLOR_DIM).size(14.0))
+                                .frame(false)
+                                .sense(Sense::drag()),
+                        );
+
                         let is_on = self.output_states.get(output_index).copied().unwrap_or(false);
                         ui.label(if is_on { "🟡" } else { "⚫" });
                         ui.add(
                             TextEdit::singleline(&mut self.graph.outputs[output_index])
-                                .desired_width(70.0)
+                                .desired_width(60.0)
                                 .font(TextStyle::Small),
                         );
                         if ui.small_button("✖").clicked() {
                             output_to_remove = Some(output_index);
                         }
+
+                        handle_response
                     });
+
+                    let row_rect = row_response.response.rect;
+                    row_centre_ys.push(row_rect.center().y);
+
+                    let handle_response = row_response.inner;
+
+                    if handle_response.drag_started() {
+                        self.output_drag_reorder = Some((output_index, output_index));
+                    }
+
+                    if handle_response.dragged() {
+                        if let Some(pointer_pos) = ui.input(|input_state| input_state.pointer.interact_pos()) {
+                            let target_index = closest_index_to_y(pointer_pos.y, &row_centre_ys);
+                            if let Some((dragged_index, _)) = self.output_drag_reorder {
+                                self.output_drag_reorder = Some((dragged_index, target_index));
+                            }
+                        }
+                    }
+
+                    if handle_response.drag_stopped() {
+                        if let Some((dragged_index, target_index)) = self.output_drag_reorder.take() {
+                            if dragged_index != target_index {
+                                reorder_from_to = Some((dragged_index, target_index));
+                            }
+                        }
+                    }
                 }
+
+                if let Some((old_index, new_index)) = reorder_from_to {
+                    if old_index < self.output_states.len() && new_index < self.output_states.len() {
+                        if old_index < new_index {
+                            self.output_states[old_index..=new_index].rotate_left(1);
+                        } else {
+                            self.output_states[new_index..=old_index].rotate_right(1);
+                        }
+                    }
+                    self.graph.reorder_output(old_index, new_index);
+                }
+
                 if let Some(index) = output_to_remove {
                     self.graph.remove_output(index);
                     if index < self.output_states.len() {
@@ -256,8 +398,6 @@ impl App {
                     );
                     ui.add_space(4.0);
 
-                    // Collect actions deferred out of the borrow — we can't mutate
-                    // self while iterating self.library.
                     let mut gate_to_open:   Option<usize> = None;
                     let mut gate_to_delete: Option<usize> = None;
                     let mut gate_to_rename: Option<usize> = None;
@@ -317,7 +457,26 @@ impl App {
                         if let Some(rename_index) = self.library_rename_index {
                             let new_name = self.library_rename_text.trim().to_string();
                             if !new_name.is_empty() {
-                                self.library[rename_index].name = new_name;
+                                self.library[rename_index].name        = new_name.clone();
+                                self.library[rename_index].graph.inputs = self.library[rename_index].graph.inputs.clone(); // no-op, name only
+                                // Clone the updated gate *before* we take the library out.
+                                let updated_gate = self.library[rename_index].clone();
+                                // Propagate the new name to all instances in the active canvas.
+                                Self::update_saved_gate_instances_in_graph(
+                                    &mut self.graph,
+                                    rename_index,
+                                    &updated_gate,
+                                );
+                                // Propagate to all library graphs.
+                                let mut library = std::mem::take(&mut self.library);
+                                for library_gate in &mut library {
+                                    Self::update_saved_gate_instances_in_graph(
+                                        &mut library_gate.graph,
+                                        rename_index,
+                                        &updated_gate,
+                                    );
+                                }
+                                self.library = library;
                             }
                         }
                         self.library_rename_index = None;
@@ -336,4 +495,26 @@ impl App {
                 }
             });
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Drop-target resolution
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Given the screen-y of the pointer and a list of row centre-y values (in order),
+/// return the index of the row whose centre is closest to the pointer.
+fn closest_index_to_y(pointer_y: f32, row_centre_ys: &[f32]) -> usize {
+    if row_centre_ys.is_empty() {
+        return 0;
+    }
+    let mut closest_index = 0;
+    let mut closest_distance = f32::MAX;
+    for (row_index, &centre_y) in row_centre_ys.iter().enumerate() {
+        let distance = (pointer_y - centre_y).abs();
+        if distance < closest_distance {
+            closest_distance = distance;
+            closest_index = row_index;
+        }
+    }
+    closest_index
 }

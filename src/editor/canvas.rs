@@ -13,7 +13,7 @@ use super::constants::{
 };
 use super::geometry::{
     canvas_rect_from_two_points, draw_bezier_wire, input_port_canvas_pos,
-    make_nand_node, output_port_canvas_pos, snap_to_grid,
+    make_nand_node, make_saved_gate_node, output_port_canvas_pos, snap_to_grid,
 };
 use super::graph::{BulkWireState, EditorNode, EditorNodeKind, Wire};
 
@@ -176,13 +176,15 @@ impl App {
                             }
                             if let Some(library_index) = gate_to_spawn {
                                 let saved_gate = &self.library[library_index];
-                                self.graph.nodes.push(EditorNode {
-                                    label:        saved_gate.name.clone(),
-                                    pos:          spawn_canvas_pos,
-                                    input_count:  saved_gate.input_count,
-                                    output_count: saved_gate.output_count,
-                                    kind:         EditorNodeKind::SavedGate(library_index),
-                                });
+                                let input_labels: Vec<String>  = saved_gate.graph.inputs.clone();
+                                let output_labels: Vec<String> = saved_gate.graph.outputs.clone();
+                                self.graph.nodes.push(make_saved_gate_node(
+                                    spawn_canvas_pos,
+                                    library_index,
+                                    saved_gate.name.clone(),
+                                    input_labels,
+                                    output_labels,
+                                ));
                             }
                         }
                     });

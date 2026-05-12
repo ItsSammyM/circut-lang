@@ -162,14 +162,16 @@ impl App {
             Stroke::new(1.5, border_color),
         );
         painter.text(
-            node_rect.center_top() + vec2(0.0, 13.0 * self.canvas_zoom),
+            node_rect.center_top() + vec2(0.0, 10.0 * self.canvas_zoom),
             Align2::CENTER_CENTER,
             &node.label,
-            FontId::proportional(12.0 * self.canvas_zoom),
+            FontId::proportional(11.0 * self.canvas_zoom),
             COLOR_TEXT,
         );
 
         let node_id = self.graph.gate_node_id(gate_index);
+
+        // ── Input port dots and labels ────────────────────────────────────────
 
         for port_index in 0..node.input_count {
             let canvas_pos = input_port_canvas_pos(node, port_index);
@@ -181,7 +183,25 @@ impl App {
                 PORT_RADIUS * self.canvas_zoom,
                 Stroke::new(1.0, Color32::WHITE),
             );
+
+            // Port label — drawn just inside the node body to the right of the dot.
+            let label = node
+                .input_labels
+                .get(port_index)
+                .map(|s| s.as_str())
+                .unwrap_or("");
+            if !label.is_empty() {
+                painter.text(
+                    screen_pos + vec2(PORT_RADIUS * self.canvas_zoom + 3.0, 0.0),
+                    Align2::LEFT_CENTER,
+                    label,
+                    FontId::proportional(9.0 * self.canvas_zoom),
+                    Color32::from_rgb(160, 180, 220),
+                );
+            }
         }
+
+        // ── Output port dots and labels ───────────────────────────────────────
 
         for port_index in 0..node.output_count {
             let canvas_pos = output_port_canvas_pos(node, port_index);
@@ -193,6 +213,22 @@ impl App {
                 PORT_RADIUS * self.canvas_zoom,
                 Stroke::new(1.0, Color32::WHITE),
             );
+
+            // Port label — drawn just inside the node body to the left of the dot.
+            let label = node
+                .output_labels
+                .get(port_index)
+                .map(|s| s.as_str())
+                .unwrap_or("");
+            if !label.is_empty() {
+                painter.text(
+                    screen_pos - vec2(PORT_RADIUS * self.canvas_zoom + 3.0, 0.0),
+                    Align2::RIGHT_CENTER,
+                    label,
+                    FontId::proportional(9.0 * self.canvas_zoom),
+                    Color32::from_rgb(160, 180, 220),
+                );
+            }
         }
     }
 

@@ -51,6 +51,10 @@ pub struct EditorNode {
     pub input_count: usize,
     pub output_count: usize,
     pub kind: EditorNodeKind,
+    /// Names of each input port, in order.  Length always equals `input_count`.
+    pub input_labels: Vec<String>,
+    /// Names of each output port, in order.  Length always equals `output_count`.
+    pub output_labels: Vec<String>,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -200,6 +204,148 @@ impl EditorGraph {
     /// Remove a specific wire (by value equality).
     pub fn remove_wire(&mut self, wire_to_remove: &Wire) {
         self.wires.retain(|wire| wire != wire_to_remove);
+    }
+
+    /// Move the input at `old_index` to `new_index`, sliding the items in between,
+    /// and rewrite all wire node-ids so wires stay connected to the same logical port.
+    ///
+    /// Input node-ids are just their index (0..inputs.len()), so moving one input
+    /// is a permutation of those ids.  We build an explicit old→new mapping and
+    /// apply it to every wire endpoint that falls in the input range.
+    pub fn reorder_input(&mut self, old_index: usize, new_index: usize) {
+        if old_index == new_index
+            || old_index >= self.inputs.len()
+            || new_index >= self.inputs.len()
+        {
+            return;
+        }
+
+        // Compute the new node-id for each old input node-id under the rotation.
+        // After Vec::rotate_left(1) on [old..=new], the item at old_index ends up
+        // at new_index and everything in between shifts left by one.
+        // After Vec::rotate_right(1) on [new..=old], the item at old_index ends up
+        // at new_index and everything in between shifts right by one.
+        let permuted_input_node_id = |node_id: usize| -> usize {
+            if node_id >= self.inputs.len() {
+                return node_id; // not an input node, unchanged
+            }
+            if node_id == old_index {
+                return new_index;
+            }
+            if old_index < new_index {
+                // items in (old_index, new_index] slide left
+                if node_id > old_index && node_id <= new_index {
+                    return node_id - 1;
+                }
+            } else {
+                // items in [new_index, old_index) slide right
+                if node_id >= new_index && node_id < old_index {
+                    return node_id + 1;
+                }
+            }
+            node_id
+        };
+
+        for wire in &mut self.wires {
+            wire.from.node = permuted_input_node_id(wire.from.node);
+            wire.to.node   = permuted_input_node_id(wire.to.node);
+        }
+
+        if old_index < new_index {
+            self.inputs[old_index..=new_index].rotate_left(1);
+        } else {
+            self.inputs[new_index..=old_index].rotate_right(1);
+        }
+    }
+
+    /// Move the output at `old_index` to `new_index`, sliding the items in between,
+    /// and rewrite all wire node-ids so wires stay connected to the same logical port.
+    ///
+    /// Output node-ids are `inputs.len() + output_index`, so we apply the same
+    /// permutation logic, offset by `inputs.len()`.
+    pub fn reorder_output(&mut self, old_index: usize, new_index: usize) {
+        if old_index == new_index
+            || old_index >= self.outputs.len()
+            || new_index >= self.outputs.len()
+        {
+            return;
+        }
+
+        let input_count = self.inputs.len();
+        let output_count = self.outputs.len();
+
+        let permuted_output_node_id = |node_id: usize| -> usize {
+            if node_id < input_count || node_id >= input_count + output_count {
+                return node_id; // not an output node, unchanged
+            }
+            let output_index = node_id - input_count;
+            if output_index == old_index {
+                return input_count + new_index;
+            }
+            if old_index < new_index {
+                if output_index > old_index && output_index <= new_index {
+                    return node_id - 1;
+                }
+            } else {
+                if output_index >= new_index && output_index < old_index {
+                    return node_id + 1;
+                }
+            }
+            node_id
+        };
+
+        for wire in &mut self.wires {
+            wire.from.node = permuted_output_node_id(wire.from.node);
+            wire.to.node   = permuted_output_node_id(wire.to.node);
+        }
+
+        if old_index < new_index {
+            self.outputs[old_index..=new_index].rotate_left(1);
+        } else {
+            self.outputs[new_index..=old_index].rotate_right(1);
+        }
+    }
+
+    /// Remove all gate nodes whose kind is `SavedGate(library_index)`,
+    /// along with every wire connected to them, and fix up the remaining wire node-ids.
+    ///
+    /// Gates are removed in reverse-index order so each removal does not invalidate
+    /// the indices of gates still to be removed.
+    pub fn remove_all_gates_of_library_index(&mut self, library_index: usize) {
+        let gate_indices_to_remove: Vec<usize> = self
+            .nodes
+            .iter()
+            .enumerate()
+            .filter_map(|(gate_index, node)| {
+                if matches!(node.kind, EditorNodeKind::SavedGate(idx) if idx == library_index) {
+                    Some(gate_index)
+                } else {
+                    None
+                }
+            })
+            .rev()
+            .collect();
+
+        for gate_index in gate_indices_to_remove {
+            self.remove_gate(gate_index);
+        }
+    }
+
+    /// After a library entry has been removed at `deleted_library_index`, decrement
+    /// every `SavedGate` reference whose index is above `deleted_library_index`.
+    /// Gates that referenced exactly `deleted_library_index` must already have been
+    /// removed by `remove_all_gates_of_library_index` before calling this.
+    pub fn remap_saved_gate_indices_after_library_deletion(
+        &mut self,
+        deleted_library_index: usize,
+    ) {
+        for node in &mut self.nodes {
+            if let EditorNodeKind::SavedGate(reference_index) = &mut node.kind {
+                if *reference_index > deleted_library_index {
+                    *reference_index -= 1;
+                }
+            }
+        }
     }
 }
 
