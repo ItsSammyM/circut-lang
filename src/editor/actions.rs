@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use bincode::Options;
+
 use super::app::App;
 use super::graph::{BulkWireState, EditorGraph, EditorNodeKind, LibraryGate};
 
@@ -127,11 +129,11 @@ impl App {
 
     pub fn load_library_from_file(&mut self) {
         fn fallible_load() -> Result<Vec<LibraryGate>, &'static str> {
-            bincode::deserialize_from(
-                std::fs::File::open("my_library.logic_builder_lib")
-                    .map_err(|_| "failed to open file to load library")?,
-            )
-            .map_err(|_| "failed to deserialize library on load")
+            let file = std::fs::File::open("my_library.logic_builder_lib").map_err(|_| "failed to open file to load library")?;
+            bincode::config::DefaultOptions::new()
+                .with_limit(10 * 1024 * 1024)
+                .deserialize_from(file)
+                .map_err(|_| "failed to deserialize library on load")
         }
         match fallible_load() {
             Ok(library) => self.library = library,
