@@ -44,3 +44,36 @@ pub const COLOR_TEXT: Color32              = Color32::from_rgb(210, 218, 255);
 pub const COLOR_DIM: Color32               = Color32::from_rgb(120, 130, 170);
 pub const COLOR_BOX_SELECT: Color32        = Color32::from_rgba_premultiplied(80, 160, 255, 30);
 pub const COLOR_BOX_SELECT_BORDER: Color32 = Color32::from_rgb(80, 160, 255);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Font sizes (Typographic scale)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Font size for small dim text (e.g., panel hints, tips).
+pub const FONT_SIZE_SMALL: f32 = 10.0;
+
+/// Font size for standard body text (e.g., buttons, subheaders, context menu items).
+pub const FONT_SIZE_BODY: f32 = 11.0;
+
+/// Font size for subheadings (e.g., status text, item headers).
+pub const FONT_SIZE_SUBHEAD: f32 = 12.0;
+
+/// Font size for headings (e.g., section headers, context menu titles).
+pub const FONT_SIZE_HEADING: f32 = 13.0;
+
+/// Font size for icons (e.g., drag handles).
+pub const FONT_SIZE_ICON: f32 = 14.0;
+
+/// Font size for large icons (e.g., top bar app icon).
+pub const FONT_SIZE_LARGE: f32 = 22.0;
+
+// Canvas-specific font sizes (zoom-scaled, so they must be separate)
+
+/// Font size for I/O rail port labels on the canvas.
+pub const FONT_SIZE_IO_RAIL_LABEL: f32 = 12.0;
+
+/// Font size for gate node titles on the canvas.
+pub const FONT_SIZE_NODE_LABEL: f32 = 11.0;
+
+/// Font size for gate node port labels on the canvas.
+pub const FONT_SIZE_NODE_PORT_LABEL: f32 = 9.0;

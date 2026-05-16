@@ -5,6 +5,7 @@ use super::constants::{
     COLOR_NODE_FILL, COLOR_NODE_HOVERED, COLOR_NODE_STROKE,
     COLOR_PORT_INPUT, COLOR_PORT_OUTPUT, COLOR_SIGNAL_HIGH, COLOR_SIGNAL_LOW,
     COLOR_TEXT, IO_RAIL_STEP, NODE_WIDTH, PORT_RADIUS, PORT_TOP_PADDING, PORT_VERTICAL_STEP,
+    FONT_SIZE_IO_RAIL_LABEL, FONT_SIZE_NODE_LABEL, FONT_SIZE_NODE_PORT_LABEL,
 };
 use super::graph::{EditorNode, EditorNodeKind};
 
@@ -33,7 +34,7 @@ impl App {
                 screen_pos + vec2(14.0, 0.0),
                 Align2::LEFT_CENTER,
                 input_name,
-                FontId::proportional(12.0),
+                FontId::proportional(FONT_SIZE_IO_RAIL_LABEL),
                 COLOR_TEXT,
             );
         }
@@ -52,7 +53,7 @@ impl App {
                 screen_pos - vec2(14.0, 0.0),
                 Align2::RIGHT_CENTER,
                 output_name,
-                FontId::proportional(12.0),
+                FontId::proportional(FONT_SIZE_IO_RAIL_LABEL),
                 COLOR_TEXT,
             );
         }
@@ -98,7 +99,7 @@ impl App {
             node_rect.center_top() + vec2(0.0, 10.0 * self.canvas_zoom),
             Align2::CENTER_CENTER,
             &node.label,
-            FontId::proportional(11.0 * self.canvas_zoom),
+            FontId::proportional(FONT_SIZE_NODE_LABEL * self.canvas_zoom),
             COLOR_TEXT,
         );
 
@@ -121,7 +122,7 @@ impl App {
                     screen_pos + vec2(PORT_RADIUS * self.canvas_zoom + 3.0, 0.0),
                     Align2::LEFT_CENTER,
                     label,
-                    FontId::proportional(9.0 * self.canvas_zoom),
+                    FontId::proportional(FONT_SIZE_NODE_PORT_LABEL * self.canvas_zoom),
                     Color32::from_rgb(160, 180, 220),
                 );
             }
@@ -144,7 +145,7 @@ impl App {
                     screen_pos - vec2(PORT_RADIUS * self.canvas_zoom + 3.0, 0.0),
                     Align2::RIGHT_CENTER,
                     label,
-                    FontId::proportional(9.0 * self.canvas_zoom),
+                    FontId::proportional(FONT_SIZE_NODE_PORT_LABEL * self.canvas_zoom),
                     Color32::from_rgb(160, 180, 220),
                 );
             }

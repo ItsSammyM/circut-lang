@@ -10,6 +10,7 @@ use super::constants::{
     COLOR_BACKGROUND, COLOR_BOX_SELECT, COLOR_BOX_SELECT_BORDER, COLOR_DIM,
     COLOR_PORT_INPUT, COLOR_PORT_OUTPUT, COLOR_SIGNAL_HIGH, COLOR_WIRE_PENDING,
     GRID_CELL_SIZE, IO_RAIL_STEP, PORT_RADIUS,
+    FONT_SIZE_HEADING, FONT_SIZE_BODY, FONT_SIZE_SUBHEAD,
 };
 // Updated imports:
 use super::viewport::snap_to_grid;
@@ -143,7 +144,7 @@ impl App {
                     canvas_response.context_menu(|ui| {
                         let spawn_canvas_pos = self.context_menu_spawn_pos.unwrap_or(Pos2::ZERO);
 
-                        ui.label(RichText::new("Add Gate").strong().size(13.0));
+                        ui.label(RichText::new("Add Gate").strong().size(FONT_SIZE_HEADING));
                         ui.separator();
 
                         if ui.button("⊼  NAND  (2→1)").clicked() {
@@ -157,7 +158,7 @@ impl App {
                                 RichText::new("Library")
                                     .color(COLOR_DIM)
                                     .italics()
-                                    .size(11.0),
+                                    .size(FONT_SIZE_BODY),
                             );
                             let mut gate_to_spawn: Option<usize> = None;
                             for (library_index, saved_gate) in self.library.iter().enumerate() {
@@ -456,7 +457,7 @@ impl App {
                     screen_rect.left_top() - vec2(0.0, 14.0),
                     Align2::LEFT_BOTTOM,
                     "Select OUTPUT ports",
-                    FontId::proportional(11.0),
+                    FontId::proportional(FONT_SIZE_BODY),
                     COLOR_BOX_SELECT_BORDER,
                 );
             }
@@ -480,7 +481,7 @@ impl App {
                         "{} outputs selected — Shift+drag to pick inputs",
                         selected_output_ports.len()
                     ),
-                    FontId::proportional(12.0),
+                    FontId::proportional(FONT_SIZE_SUBHEAD),
                     COLOR_SIGNAL_HIGH,
                 );
             }
@@ -514,7 +515,7 @@ impl App {
                     screen_rect.left_top() - vec2(0.0, 14.0),
                     Align2::LEFT_BOTTOM,
                     "Select INPUT ports",
-                    FontId::proportional(11.0),
+                    FontId::proportional(FONT_SIZE_BODY),
                     Color32::from_rgb(255, 140, 80),
                 );
             }

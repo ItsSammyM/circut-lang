@@ -4,7 +4,11 @@ use egui::{
 };
 
 use super::app::App;
-use super::constants::{COLOR_DIM, COLOR_PANEL_BG, COLOR_PORT_INPUT, COLOR_PORT_OUTPUT, COLOR_SIGNAL_HIGH};
+use super::constants::{
+    COLOR_DIM, COLOR_PANEL_BG, COLOR_PORT_INPUT, COLOR_PORT_OUTPUT, COLOR_SIGNAL_HIGH,
+    FONT_SIZE_LARGE, FONT_SIZE_BODY, FONT_SIZE_SUBHEAD,
+    FONT_SIZE_ICON, FONT_SIZE_SMALL,
+};
 
 impl App {
     // ─────────────────────────────────────────────────────────────────────────
@@ -21,7 +25,7 @@ impl App {
             )
             .show(ctx, |ui| {
                 ui.horizontal_centered(|ui| {
-                    ui.label(RichText::new("⚡").size(22.0));
+                    ui.label(RichText::new("⚡").size(FONT_SIZE_LARGE));
                     ui.add(
                         TextEdit::singleline(&mut self.title)
                             .desired_width(200.0)
@@ -72,13 +76,13 @@ impl App {
                         ui.label(
                             RichText::new(format!("⚠  {error_message}"))
                                 .color(Color32::RED)
-                                .size(11.5),
+                                .size(FONT_SIZE_BODY),
                         );
                     } else if self.simulation.is_some() {
                         ui.label(
                             RichText::new(if self.simulation_running { "● Running" } else { "● Built" })
                                 .color(COLOR_SIGNAL_HIGH)
-                                .size(12.0),
+                                .size(FONT_SIZE_SUBHEAD),
                         );
                     }
                 });
@@ -128,7 +132,7 @@ impl App {
 
                     let row_response = ui.horizontal(|ui| {
                         let handle_response = ui.add(
-                            Button::new(RichText::new("⠿").color(COLOR_DIM).size(14.0))
+                            Button::new(RichText::new("⠿").color(COLOR_DIM).size(FONT_SIZE_ICON))
                                 .frame(false)
                                 .sense(Sense::drag()),
                         );
@@ -215,7 +219,7 @@ impl App {
                 });
 
                 ui.add_space(16.0);
-                ui.label(RichText::new("TIPS").color(COLOR_DIM).strong().size(10.5));
+                ui.label(RichText::new("TIPS").color(COLOR_DIM).strong().size(FONT_SIZE_SMALL));
                 for hint_text in &[
                     "Right-click canvas\nto spawn gates",
                     "Click output (yellow)\nthen input (blue)\nto connect",
@@ -225,7 +229,7 @@ impl App {
                     "Hover + Del\nto delete a gate",
                     "Drag ⠿ to reorder\nports",
                 ] {
-                    ui.label(RichText::new(*hint_text).color(COLOR_DIM).size(10.0));
+                    ui.label(RichText::new(*hint_text).color(COLOR_DIM).size(FONT_SIZE_SMALL));
                     ui.add_space(3.0);
                 }
             });
@@ -274,7 +278,7 @@ impl App {
 
                     let row_response = ui.horizontal(|ui| {
                         let handle_response = ui.add(
-                            Button::new(RichText::new("⠿").color(COLOR_DIM).size(14.0))
+                            Button::new(RichText::new("⠿").color(COLOR_DIM).size(FONT_SIZE_ICON))
                                 .frame(false)
                                 .sense(Sense::drag()),
                         );
@@ -359,7 +363,7 @@ impl App {
                 // ── Library ───────────────────────────────────────────────────
 
                 ui.add_space(12.0);
-                ui.label(RichText::new("LIBRARY").color(COLOR_DIM).strong().size(11.0));
+                ui.label(RichText::new("LIBRARY").color(COLOR_DIM).strong().size(FONT_SIZE_BODY));
                 ui.separator();
 
                 ui.horizontal(|ui| {
@@ -386,7 +390,7 @@ impl App {
                         RichText::new("Right-click to manage")
                             .color(COLOR_DIM)
                             .italics()
-                            .size(10.0),
+                            .size(FONT_SIZE_SMALL),
                     );
                     ui.add_space(4.0);
 
@@ -420,14 +424,14 @@ impl App {
                         let button_response = ui.add(
                             Button::new(
                                 RichText::new(&button_label)
-                                    .size(11.0)
+                                    .size(FONT_SIZE_BODY)
                                     .color(Color32::from_rgb(180, 200, 255)),
                             )
                             .frame(false),
                         );
 
                         button_response.context_menu(|ui| {
-                            ui.label(RichText::new(&saved_gate.name).strong().size(12.0));
+                            ui.label(RichText::new(&saved_gate.name).strong().size(FONT_SIZE_SUBHEAD));
                             ui.separator();
                             if ui.button("📂  Open for editing").clicked() {
                                 gate_to_open = Some(library_index);

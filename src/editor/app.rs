@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::constants::{COLOR_PANEL_BG, COLOR_TEXT};
+use super::constants::{COLOR_PANEL_BG, COLOR_TEXT, FONT_SIZE_HEADING};
 use egui::Pos2;
 use egui::Vec2;
 use egui::{Visuals, ViewportBuilder};
@@ -112,7 +112,7 @@ impl eframe::App for App {
         let mut style = (*ctx.style()).clone();
         style.text_styles.insert(
             egui::TextStyle::Small,
-            egui::FontId::proportional(13.0),
+            egui::FontId::proportional(FONT_SIZE_HEADING),
         );
         ctx.set_style(style);
 
