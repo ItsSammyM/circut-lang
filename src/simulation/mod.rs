@@ -3,10 +3,28 @@ use serde::{Deserialize, Serialize};
 use self::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct NodeId(pub u32);
+pub struct NodeId(u32);
+impl NodeId{
+    pub fn new_unchecked(i: u32)->Self{
+        NodeId(i)
+    }
+}
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct WireId(pub u32);
+pub struct WireId(u32);
 impl WireId{
+    pub fn new_unchecked(i: u32)->Self{
+        WireId(i)
+    }
+    pub fn new_from_sim(i: u32, sim: &Simulation)->Option<Self>{
+        if sim.wire_states.current().len() > i {
+            Some(WireId(i))
+        }else{
+            None
+        }
+    }
+    fn i(&self)->u32{
+        self.0
+    }
     fn next_value(&self, state: &WireState)->bool{
         state.get_next(*self)
     }

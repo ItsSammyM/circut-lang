@@ -1,3 +1,5 @@
+use crate::runtime::ExternalNodeLibrary;
+
 use super::prelude::*;
 
 fn not_sim()->Simulation{
@@ -51,13 +53,13 @@ fn xor_sim()->Simulation{
 #[test]
 fn test_not_false(){
     let mut sim = not_sim();
-    sim.run_ticks(1);
+    sim.run_ticks(&mut ExternalNodeLibrary::default(), 1);
     assert_eq!(sim.outputs().collect::<Box<[bool]>>()[0], true);
 }
 #[test]
 fn test_not_true(){
     let mut sim = not_sim();
     sim.force_set_wire(WireId(0), true);
-    sim.run_ticks(1);
+    sim.run_ticks(&mut ExternalNodeLibrary::default(), 1);
     assert_eq!(sim.outputs().collect::<Box<[bool]>>()[0], false);
 }

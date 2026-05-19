@@ -1,4 +1,6 @@
+use crate::runtime::ExternalNodeLibrary;
 use super::prelude::*;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Node{
     pub kind: NodeKind  
@@ -17,7 +19,11 @@ pub enum NodeKind{
         outputs: Vec<WireId>,
         simulation: Box<Simulation>,
     },
-    // External(ExternalNodeKind),
+    External{
+        inputs: Vec<WireId>,
+        outputs: Vec<WireId>,
+        closure_name: String
+    },
 }
 
 impl NodeId{
@@ -31,7 +37,7 @@ impl NodeId{
     /// - Reading the current state
     /// - Setting the value of the nodes output wires in the next state
     /// - Dirtying the wires that it changes
-    pub fn evaluate(&self, nodes: &mut Nodes, wire_states: &mut WireState){
+    pub fn evaluate(&self, nodes: &mut Nodes, wire_states: &mut WireState, external_node_lib: &mut ExternalNodeLibrary){
         match &mut self.get_mut(nodes).kind {
             NodeKind::Nand { input_a, input_b, output } => {
                 let value = !(input_a.current_value(wire_states) && input_b.current_value(wire_states));
@@ -50,7 +56,7 @@ impl NodeId{
                     );
                 }
                 
-                simulation.run_one_tick();
+                simulation.run_one_tick(external_node_lib);
                 
                 for (inner_wire, outer_wire) in simulation.output_wires.iter().zip(outputs.iter()){
                     let value = inner_wire.current_value(&simulation.wire_states);
@@ -60,13 +66,30 @@ impl NodeId{
                     );
                 }
             },
+            NodeKind::External {
+                inputs,
+                outputs,
+                closure_name
+            } => {
+
+                let in_vals = inputs.iter().map(|wire|wire.current_value(wire_states)).collect();
+                
+                let out_vals = external_node_lib.get_output(closure_name, in_vals);
+                outputs
+                    .into_iter()
+                    .zip(out_vals.into_iter())
+                    .for_each(|(outputs, out_vals)|{
+                        outputs.set_next(wire_states, out_vals);
+                    });
+            }
         }
     }
 
     pub fn input_wires(&self, nodes: &Nodes)->Box<[WireId]>{
         match &self.get(nodes).kind {
-            NodeKind::Nand { input_a, input_b, output } => [*input_a, *input_b].into(),
-            NodeKind::Graph { inputs, outputs, simulation } => inputs.as_slice().into(),
+            NodeKind::Nand { input_a, input_b, .. } => [*input_a, *input_b].into(),
+            NodeKind::Graph { inputs, .. } => inputs.as_slice().into(),
+            NodeKind::External { inputs, .. } => inputs.as_slice().into(),
         }
     }
 }
