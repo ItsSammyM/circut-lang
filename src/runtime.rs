@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::{compile::{CompileError, Compiler}, script::CircutLangScript, simulation::{WireId, simulation::Simulation}};
+use crate::{compile::{CompileError, Compiler}, external_node_descriptions::ExternalNodeDescrptions, script::CircutLangScript, simulation::{WireId, simulation::Simulation}};
 
 pub struct Runtime{
     simulation: Simulation,
@@ -8,28 +8,34 @@ impl Runtime{
     pub fn new(simulation: Simulation)->Self{
         Self { simulation }
     }
-    pub fn new_compile(script: CircutLangScript)->Result<Self, CompileError>{
+    /// External node descriptions is only here to cause the compiler to produce an error if wired improperly
+    pub fn new_compile(script: CircutLangScript, external_node_descriptions: Option<ExternalNodeDescrptions>)->Result<Self, CompileError>{
         Ok(Self{
-            simulation: Compiler::compile(script)?
+            simulation: Compiler::compile(script, external_node_descriptions)?
         })
     }
-    pub fn run_one_tick(&mut self, set_input: Option<GateInput>, external_node_library: &mut ExternalNodeLibrary)->Result<(), RuntimeError>{
-        if let Some(set_input) = set_input {
-            self
-                .simulation
-                .input_wires
-                .clone()
-                .into_iter()
-                .zip(set_input.into_iter())
-                .for_each(|(wire, set_input)|self.simulation.force_set_wire(wire, set_input));
-        }
+    pub fn run_one_tick(&mut self, external_node_library: &mut ExternalNodeLibrary)->Result<(), RuntimeError>{
         self.simulation.run_one_tick(external_node_library)
+    }
+    pub fn run_one_tick_with_io(&mut self, input: GateInput, external_node_library: &mut ExternalNodeLibrary)->Result<GateOutput, RuntimeError>{
+        self.set_input_values(input);
+        self.simulation.run_one_tick(external_node_library)?;
+        Ok(self.output_values())
     }
     pub fn wire_value(&self, wire: WireId) -> bool {
         wire.current_value(&self.simulation.wire_states)
     }
     pub fn output_values(&self)->GateOutput{
         self.simulation.outputs().collect()
+    }
+    pub fn set_input_values(&mut self, input: GateInput){
+        self
+            .simulation
+            .input_wires
+            .clone()
+            .into_iter()
+            .zip(input.into_iter())
+            .for_each(|(wire, val)|self.simulation.force_set_wire(wire, val));
     }
 }
 #[must_use]
@@ -53,13 +59,6 @@ impl<'a> ExternalNodeLibrary<'a> {
     pub fn insert(&'a mut self, name: String, closure: &'a mut dyn FnMut(GateInput)->GateOutput) -> &'a mut Self{
         self.nodes.insert(name, closure);
         self
-    }
-    pub fn get_output_unchecked(&mut self, node: &String, input: GateInput) -> GateOutput {
-        let closure = &mut self
-            .nodes
-            .get_mut(node)
-            .expect(format!("External Node Lib is missing node named: {}", node).as_str());
-        (closure)(input)
     }
     pub fn get_output(&mut self, node: &String, input: GateInput) -> Option<GateOutput> {
         let closure = &mut self

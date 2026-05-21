@@ -1,77 +1,68 @@
-//! Translates the editor's flat graph description into a runnable [`Simulation`].
-//!
-//! This module sits at the crate root so it can access the private `WireId` type
-//! that lives inside `simulation/mod.rs`.
-//!
-//! The key entry point is [`build_simulation`].  For `SavedGate` nodes it
-//! recursively calls itself on the saved gate's own `GraphDesc`, so the full
-//! gate hierarchy is compiled into nested [`NodeKind::Graph`] simulations.
-
-
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
-    script::{CircutLangScript, GateKind, GraphDesc},
-    simulation::{
+    external_node_descriptions::ExternalNodeDescrptions, script::{CircutLangScript, GateKind, GraphDesc}, simulation::{
         WireId, node::{Node, NodeKind}, simulation::{Nodes, Simulation}, wire_state::WireState
     }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Public description types  (used by main.rs to describe the editor graph)
-// ─────────────────────────────────────────────────────────────────────────────
 
 #[derive(Debug)]
 pub enum CompileError{
     MissingEntryPoint(String),
     MissingLibraryNode(String),
-    //MissingExternalNode is a runtime error!
+    
     ExternalNodeBadIOCount(String),
     LibraryNodeBadIOCount(String),
     NandBadIOCount(String),
+
+    CircularDependency(String),
 }
 
 pub struct Compiler{
     script: CircutLangScript,
-    compiled_sims: HashMap<String, Simulation>,
+
+    external_node_descriptions: Option<ExternalNodeDescrptions>,
+
+    compilation_finished: HashMap<String, Simulation>,
+    // gate is in started & gate is NOT in finished -> compilation has started & not finished
+    // a compilation has started and not finished -> it is currently compiling
+    // we go to compile it while it is currently compiling -> circular dep 
+    compilation_started: HashSet<String>
 }
 
 
 impl Compiler{
-    pub fn compile(script: CircutLangScript) -> Result<Simulation, CompileError> {
+    pub fn compile(script: CircutLangScript, external_node_descriptions: Option<ExternalNodeDescrptions>) -> Result<Simulation, CompileError> {
         let entry = &script.entry_point.clone();
         let mut compiler = Compiler{
             script,
-            compiled_sims: HashMap::new()
+            external_node_descriptions,
+            compilation_finished: HashMap::new(),
+            compilation_started: HashSet::new()
         };
         
-        compiler.compile_graph(entry)
+        compiler.compile_or_get_graph(entry)
     }
 
     fn compile_or_get_graph(&mut self, name: &String) -> Result<Simulation, CompileError> {
-        if let Some(sim) = self.compiled_sims.get(name) {
+        if let Some(sim) = self.compilation_finished.get(name) {
             return Ok(sim.clone());
         }
 
+        
+        if !self.compilation_started.insert(name.to_string()) {
+            return Err(CompileError::CircularDependency(name.to_string()))
+        }
         let graph = self.compile_graph(name)?;
 
-        self.compiled_sims.insert(name.clone(), graph.clone());
+        self.compilation_finished.insert(name.clone(), graph.clone());
         Ok(graph)
     }
 
-    /// Build a [`Simulation`] from a [`GraphDesc`].
-    ///
-    /// `library_descs` is the HashMap of `GraphDesc`s for every gate that has been
-    /// saved to the library.  When a `SavedGate(name)` node is encountered the
-    /// builder calls itself recursively on `library_descs[name]`, so the full
-    /// gate hierarchy is compiled without any stub pass-throughs.
-    ///
-    /// Returns `Err(message)` if the description is structurally invalid.
     pub fn compile_graph(
         &mut self,
         name: &String,
-        // desc: &GraphDesc,
-        // library_descs: &HashMap<String, GraphDesc>,
     ) -> Result<Simulation, CompileError> {
 
         // ── Wire-id assignment ────────────────────────────────────────────────────
@@ -184,7 +175,12 @@ impl Compiler{
 
                     let inner_simulation = self.compile_or_get_graph(lib_node_name)?;
 
-                    
+                    if
+                        inner_simulation.input_wires.len() != *gate_input_count || 
+                        inner_simulation.output_wires.len() != *gate_output_count
+                    {
+                        return Err(CompileError::LibraryNodeBadIOCount(format!("Inside: {}", name)));
+                    }
 
                     sim_nodes.push(Node {
                         kind: NodeKind::Graph {
@@ -204,6 +200,15 @@ impl Compiler{
                         .iter()
                         .filter_map(|maybe_id| maybe_id.map(WireId::new_unchecked))
                         .collect();
+
+                    if
+                        let Some(ref ext) = self.external_node_descriptions &&
+                        let Some(ext) = ext.nodes.get(name) &&
+                        ext.inputs.len() != *gate_input_count &&
+                        ext.outputs.len() != *gate_output_count
+                    {
+                        return Err(CompileError::ExternalNodeBadIOCount(format!("Inside: {}", name)));
+                    }
 
                     sim_nodes.push(Node {
                         kind: NodeKind::External {

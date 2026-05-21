@@ -1,12 +1,20 @@
 use std::collections::HashMap;
 
+use bincode::Options;
 use serde::{Deserialize, Serialize};
 
-
+#[derive(Debug, Deserialize, Serialize)]
 pub struct CircutLangScript{
     pub entry_point: String,
     pub gates: HashMap<String, GraphDesc>
 }
+impl CircutLangScript{
+    pub fn bincode_options()-> impl bincode::config::Options {
+        bincode::config::DefaultOptions::new()
+            .with_limit(10 * 1024 * 1024)
+    }
+}
+
 
 /// Identifies one port on one node using the flat node-id numbering that
 /// `EditorGraph` uses:
@@ -20,7 +28,7 @@ pub struct PortRef {
 }
 
 /// Describes one wire: a directed edge from an output port to an input port.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct WireDesc {
     pub from: PortRef, // output port that drives the wire
     pub to:   PortRef, // input port that is driven by the wire
@@ -28,7 +36,7 @@ pub struct WireDesc {
 
 
 /// The kind of an internal gate node inside a `GraphDesc`.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum GateKind {
     Nand,
     /// Name of the gate in the library, identifying which saved gate this instance represents.
@@ -42,7 +50,7 @@ pub enum GateKind {
 ///   `input_base  = 0`
 ///   `output_base = n_inputs`
 ///   `gate_base   = n_inputs + n_outputs`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GraphDesc {
     pub n_inputs:  usize,
     pub n_outputs: usize,
