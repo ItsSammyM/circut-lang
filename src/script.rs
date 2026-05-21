@@ -42,13 +42,22 @@ pub enum GateKind {
 ///   `input_base  = 0`
 ///   `output_base = n_inputs`
 ///   `gate_base   = n_inputs + n_outputs`
+#[derive(Debug, Clone)]
 pub struct GraphDesc {
     pub n_inputs:  usize,
     pub n_outputs: usize,
     /// One entry per internal gate: `(gate_input_count, gate_output_count, kind)`.
     pub gates: Vec<(usize, usize, GateKind)>,
     pub wires: Vec<WireDesc>,
-    pub input_base:  usize, // always 0
-    pub output_base: usize, // always n_inputs
-    pub gate_base:   usize, // always n_inputs + n_outputs
+}
+impl GraphDesc{
+    pub const fn input_base()->usize{
+        0
+    }
+    pub const fn output_base(&self)->usize{
+        self.n_inputs
+    }
+    pub const fn gate_base(&self)->usize{
+        self.n_inputs + self.n_outputs
+    }
 }

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use super::WireId;
 use crate::bit_array::BitArray;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WireState {
     current: BitArray,
     next:    BitArray,

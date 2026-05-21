@@ -10,25 +10,53 @@
 
 use std::collections::HashMap;
 
-use crate::{runtime::Runtime, script::{CircutLangScript, GateKind, GraphDesc}, simulation::{
-    WireId, node::{Node, NodeKind}, simulation::{Nodes, Simulation}, wire_state::WireState
-}};
+use crate::{
+    script::{CircutLangScript, GateKind, GraphDesc},
+    simulation::{
+        WireId, node::{Node, NodeKind}, simulation::{Nodes, Simulation}, wire_state::WireState
+    }
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Public description types  (used by main.rs to describe the editor graph)
 // ─────────────────────────────────────────────────────────────────────────────
 
+#[derive(Debug)]
+pub enum CompileError{
+    MissingEntryPoint(String),
+    MissingLibraryNode(String),
+    //MissingExternalNode is a runtime error!
+    ExternalNodeBadIOCount(String),
+    LibraryNodeBadIOCount(String),
+    NandBadIOCount(String),
+}
+
+pub struct Compiler{
+    script: CircutLangScript,
+    compiled_sims: HashMap<String, Simulation>,
+}
 
 
+impl Compiler{
+    pub fn compile(script: CircutLangScript) -> Result<Simulation, CompileError> {
+        let entry = &script.entry_point.clone();
+        let mut compiler = Compiler{
+            script,
+            compiled_sims: HashMap::new()
+        };
+        
+        compiler.compile_graph(entry)
+    }
 
+    fn compile_or_get_graph(&mut self, name: &String) -> Result<Simulation, CompileError> {
+        if let Some(sim) = self.compiled_sims.get(name) {
+            return Ok(sim.clone());
+        }
 
+        let graph = self.compile_graph(name)?;
 
-
-impl Runtime{
-
-    pub fn compile(script: CircutLangScript) -> Result<Simulation, String> {
-        let entry_graph = script.gates.get(&script.entry_point).ok_or("Entry gate name doesnt exist")?;
-        Self::compile_graph(entry_graph, &script.gates)
+        self.compiled_sims.insert(name.clone(), graph.clone());
+        Ok(graph)
     }
 
     /// Build a [`Simulation`] from a [`GraphDesc`].
@@ -40,13 +68,12 @@ impl Runtime{
     ///
     /// Returns `Err(message)` if the description is structurally invalid.
     pub fn compile_graph(
-        // script: &CircutLangScript,
-        desc: &GraphDesc,
-        library_descs: &HashMap<String, GraphDesc>,
-    ) -> Result<Simulation, String> {
+        &mut self,
+        name: &String,
+        // desc: &GraphDesc,
+        // library_descs: &HashMap<String, GraphDesc>,
+    ) -> Result<Simulation, CompileError> {
 
-        // let desc = script.gates.get(&script.entry_point).ok_or("entry point id should exist")?;
-        // let library_descs = &script.gates;
         // ── Wire-id assignment ────────────────────────────────────────────────────
         //
         // One unique wire id is assigned to each *output port* in the graph.
@@ -60,26 +87,34 @@ impl Runtime{
         // `wire_id_of_output_port[node_id][port_index]` gives the wire id, or None
         // if that (node, port) pair has no output port (output pseudo-nodes).
 
+
+        let desc = self.script
+            .gates
+            .get(name)
+            .ok_or(CompileError::MissingEntryPoint(format!("Missing: {}", self.script.entry_point)))?
+            .clone();
+
+
         let total_node_count = desc.n_inputs + desc.n_outputs + desc.gates.len();
         let mut wire_id_of_output_port: Vec<Vec<Option<u32>>> = vec![vec![]; total_node_count];
         let mut next_free_wire_id: u32 = 0;
 
         // Assign one wire id per input pseudo-node output.
         for input_index in 0..desc.n_inputs {
-            let node_id = desc.input_base + input_index;
+            let node_id = GraphDesc::input_base() + input_index;
             wire_id_of_output_port[node_id] = vec![Some(next_free_wire_id)];
             next_free_wire_id += 1;
         }
 
         // Output pseudo-nodes are sinks; they produce no wire ids.
         for output_index in 0..desc.n_outputs {
-            let node_id = desc.output_base + output_index;
+            let node_id = desc.output_base() + output_index;
             wire_id_of_output_port[node_id] = vec![];
         }
 
         // Assign wire ids to each output port of every internal gate.
         for (gate_slot, (_, gate_output_count, _)) in desc.gates.iter().enumerate() {
-            let node_id = desc.gate_base + gate_slot;
+            let node_id = desc.gate_base() + gate_slot;
             let mut port_ids = Vec::with_capacity(*gate_output_count);
             for _ in 0..*gate_output_count {
                 port_ids.push(Some(next_free_wire_id));
@@ -117,15 +152,12 @@ impl Runtime{
         for (gate_slot, (gate_input_count, gate_output_count, gate_kind)) in
             desc.gates.iter().enumerate()
         {
-            let node_id = desc.gate_base + gate_slot;
+            let node_id = desc.gate_base() + gate_slot;
 
             match gate_kind {
                 GateKind::Nand => {
                     if *gate_input_count < 2 || *gate_output_count < 1 {
-                        return Err(format!(
-                            "Gate slot {gate_slot}: NAND needs at least 2 inputs and 1 output, \
-                            got {gate_input_count} inputs and {gate_output_count} outputs"
-                        ));
+                        return Err(CompileError::NandBadIOCount(format!("Inside: {}", name)));
                     }
                     let wire_a   = WireId::new_unchecked(find_driving_wire_id(node_id, 0));
                     let wire_b   = WireId::new_unchecked(find_driving_wire_id(node_id, 1));
@@ -139,7 +171,7 @@ impl Runtime{
                         },
                     });
                 }
-                GateKind::SavedGate(library_name) => {
+                GateKind::SavedGate(lib_node_name) => {
                     // Resolve the outer wires — these live in the parent simulation's wire space.
                     let outer_input_wires: Vec<WireId> = (0..*gate_input_count)
                         .map(|port_index| WireId::new_unchecked(find_driving_wire_id(node_id, port_index)))
@@ -150,21 +182,9 @@ impl Runtime{
                         .filter_map(|maybe_id| maybe_id.map(WireId::new_unchecked))
                         .collect();
 
-                    // Recursively compile the saved gate's own graph into an inner simulation.
-                    let inner_desc = library_descs.get(library_name).ok_or_else(|| {
-                        format!(
-                            "Gate slot {gate_slot}: SavedGate references library name \
-                            '{library_name}', but the library does not contain it"
-                        )
-                    })?;
+                    let inner_simulation = self.compile_or_get_graph(lib_node_name)?;
 
-                    let inner_simulation = Self::compile_graph(&inner_desc, library_descs)
-                        .map_err(|inner_error| {
-                            format!(
-                                "Gate slot {gate_slot}: error compiling inner gate at \
-                                library name '{library_name}': {inner_error}"
-                            )
-                        })?;
+                    
 
                     sim_nodes.push(Node {
                         kind: NodeKind::Graph {
@@ -200,7 +220,7 @@ impl Runtime{
 
         let sim_output_wire_ids: Vec<WireId> = (0..desc.n_outputs)
             .map(|output_index| {
-                WireId::new_unchecked(find_driving_wire_id(desc.output_base + output_index, 0))
+                WireId::new_unchecked(find_driving_wire_id(desc.output_base() + output_index, 0))
             })
             .collect();
 
@@ -208,7 +228,7 @@ impl Runtime{
 
         let sim_input_wire_ids: Vec<WireId> = (0..desc.n_inputs)
             .map(|input_index| {
-                WireId::new_unchecked(wire_id_of_output_port[desc.input_base + input_index][0].unwrap())
+                WireId::new_unchecked(wire_id_of_output_port[GraphDesc::input_base() + input_index][0].unwrap())
             })
             .collect();
 

@@ -22,12 +22,12 @@ impl WireId{
             None
         }
     }
-    fn i(&self)->u32{
+    pub fn i(&self)->u32{
         self.0
     }
-    fn next_value(&self, state: &WireState)->bool{
-        state.get_next(*self)
-    }
+    // fn next_value(&self, state: &WireState)->bool{
+    //     state.get_next(*self)
+    // }
     pub fn current_value(&self, state: &WireState)->bool{
         state.get_current(*self)
     }
