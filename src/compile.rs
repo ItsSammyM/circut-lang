@@ -19,10 +19,10 @@ pub enum CompileError{
     CircularDependency(String),
 }
 
-pub struct Compiler{
+pub struct Compiler<'a>{
     script: CircutLangScript,
 
-    external_node_descriptions: Option<ExternalNodeDescrptions>,
+    external_node_descriptions: Option<&'a ExternalNodeDescrptions>,
 
     compilation_finished: HashMap<String, Simulation>,
     // gate is in started & gate is NOT in finished -> compilation has started & not finished
@@ -32,8 +32,8 @@ pub struct Compiler{
 }
 
 
-impl Compiler{
-    pub fn compile(script: CircutLangScript, external_node_descriptions: Option<ExternalNodeDescrptions>) -> Result<Simulation, CompileError> {
+impl<'a> Compiler<'a>{
+    pub fn compile(script: CircutLangScript, external_node_descriptions: Option<&ExternalNodeDescrptions>) -> Result<Simulation, CompileError> {
         let entry = &script.entry_point.clone();
         let mut compiler = Compiler{
             script,

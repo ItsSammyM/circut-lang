@@ -9,7 +9,7 @@ impl Runtime{
         Self { simulation }
     }
     /// External node descriptions is only here to cause the compiler to produce an error if wired improperly
-    pub fn new_compile(script: CircutLangScript, external_node_descriptions: Option<ExternalNodeDescrptions>)->Result<Self, CompileError>{
+    pub fn new_compile(script: CircutLangScript, external_node_descriptions: Option<&ExternalNodeDescrptions>)->Result<Self, CompileError>{
         Ok(Self{
             simulation: Compiler::compile(script, external_node_descriptions)?
         })
